@@ -1,0 +1,254 @@
+---
+title: "mth642/yasemin-yilmaz"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+  
+geometry: margin=1in
+date: "2025-09-13"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r mpv}
+library(MPV)
+data("table.b3")
+
+```
+
+
+
+```{r names}
+names(table.b3)<- c("mpg", "disp", "hp", "wt", "qsec", "carb", "gear", "drat", "vs", "am", "cyl", "dummy_var")
+
+```
+
+```{r p0}
+names(table.b3)<- c("mpg", "disp", "hp", "wt", "qsec", "carb", "gear", "drat", "vs", "am", "cyl", "dummy_var")
+
+table.b3$wt[is.na(table.b3$wt)] <- median(table.b3$wt, na.rm = TRUE)
+
+
+d <- table.b3
+keep <- intersect(c("mpg", "disp", "hp", "wt", "qsec", "carb", "vs", "am", "cyl"),
+                  names(d))
+```
+
+
+
+
+```{r p}
+chosen3 <- c("hp", "qsec","am")
+```
+
+ In Problem Set 1, I selected horsepower (hp) and qsec together with displacement (disp) as predictors for mpg. 
+ When I checked the diagnostics for the current model, I observed that the VIF values for disp and hp were around 9,
+ indicating a high correlation and a clear risk of multicollinearity.
+ The variable qsec was also retained because it provides independent information that is not directly captured by engine size or horsepower.
+ Despite this issue, I considered disp and hp to be the most reasonable predictors, since both are theoretically and empirically among the strongest determinants of fuel efficiency. 
+ For the next step, the task requires adding a fourth predictor. Since disp and hp already cover engine characteristics, the additional predictor should ideally capture a different dimension. 
+ In this context, drat (rear axle ratio) and am (transmission) appear to be strong candidates: both show meaningful correlations with mpg and are less collinear with disp and hp, making them more reliable additions to the model. 
+ However, while working on this assignment I decided to replace hp with vs due to the multicollinearity risk between disp and hp. 
+ Since I already submitted the previous assignment, I cannot revise that part, but in the current analysis I found it more appropriate to use vs instead of hp.
+
+
+
+
+```{r p1}
+library(car)
+
+m4 <- lm(mpg ~ disp + vs + qsec + am, data = d) 
+summary(m4)
+fitted_vals  <- fitted(m4)
+residual_vals <- resid(m4)
+head(fitted_vals); head(residual_vals)
+coef(m4)
+vif(m4)
+```
+ Multiple Linear Regression with Four Predictors
+ In Problem Set 1, I selected horsepower (hp) and qsec together with displacement (disp) as predictors for mpg.
+ When I checked the diagnostics in this assignment, I found that disp and hp had VIF values around 9, which indicates high multicollinearity.
+ Although disp and hp are both strong theoretical predictors of mpg, keeping both in the same model reduces reliability.
+ Therefore, I decided to replace hp with vs (engine shape), while keeping disp and qsec, and I added am (transmission) as the fourth predictor.
+ This way, the model combines engine size (disp), engine type (vs), acceleration performance (qsec), and transmission (am), 
+ which together represent different dimensions of vehicle characteristics.
+
+ The fitted regression equation based on my model is:
+ mpg_hat = 21.51 - 0.043 * disp + 0.059 * vs + 2.42 * qsec - 0.29 * am
+ Finally, I checked for multicollinearity using VIF values: disp = 4.08, vs = 6.73, qsec = 1.20, am = 4.90.
+Since all values are well below 10, there is no serious multicollinearity problem in this final model.
+
+
+
+```{r p2}
+# Design matrix with intercept and 4 predictors
+Y <- d$mpg
+X <- model.matrix(~ disp + vs + qsec + am, data = d)
+# Display dimensions
+dim(X)   # should be 32 x 5
+length(Y) # should be 32
+head(X)
+head(Y)
+```
+In Problem Set 1, I removed the rows with missing values (NA) because there were only two of them.  
+However, since in this assignment a full 32 × 5 matrix was required, I decided to impute the missing values with the median of the corresponding variable.  
+
+
+```{r p3}
+#Compute X'X and (X'X)^{-1}
+XtX     <- crossprod(X)          # t(X) %*% X   → 5x5
+XtX_inv <- solve(XtX)            # (X'X)^{-1}   → 5x5
+
+dim(XtX); dim(XtX_inv)
+XtX[1:3, 1:3]        
+round(XtX_inv, 6)   
+
+```
+**Step 3.**  
+I calculated \(X^TX\) and its inverse \((X^TX)^{-1}\).  
+The result was a \(5 \times 5\) matrix in both cases, as expected since the model includes an intercept and four predictors.  
+These matrices form the basis for computing the regression coefficients using the normal equations.
+
+**Step 4.**  
+Next, I computed \((X^TX)^{-1}X^TY\), which gives the estimated coefficient vector \(\hat{\beta}\).  
+The entries of this vector correspond to \(\hat{\beta}_0, \hat{\beta}_1, \hat{\beta}_2, \hat{\beta}_3, \hat{\beta}_4\), in the same order as the columns of \(X\).  
+The values matched those produced by the `lm` function, confirming the equivalence of the manual matrix calculation with the built-in regression output.
+
+```{r p4}
+XTY <- crossprod(X,Y)                       
+beta_hat_manual <- XtX_inv %*% XTY       
+beta_hat_manual <- setNames(drop(beta_hat_manual), colnames(X))
+round(beta_hat_manual, 6)
+
+all.equal(beta_hat_manual, coef(m4)) 
+```
+
+```{r p5}
+# 5) Use solve() to get coefficient vector V
+XtX <- crossprod(X)        # X'X
+XTY <- crossprod(X, Y)     # X'Y
+
+V <- solve(XtX, XTY)       # solution V = (X'X)^{-1} X'Y
+V
+all.equal(drop(V), coef(m4))
+```
+**Step 5.**  
+I solved the normal equations \((X^TX)V = X^TY\) using the `solve()` function in R.  
+The resulting vector \(V\) contained the estimated regression coefficients, and these values matched the output from the `lm` object.  
+This confirms that the coefficients obtained manually are identical to those estimated by the built-in regression function.
+
+**Step 6.**  
+Next, I calculated the fitted values using the formula  
+\[
+\hat{Y} = X (X^TX)^{-1} X^T Y,
+\]  
+which is equivalent to \(X \hat{\beta}\).  
+The fitted values obtained this way were the same as those produced by the `fitted()` function applied to the `lm` object, again confirming the consistency of the matrix approach with the standard regression output in R.
+
+```{r p6}
+Y_hat_manual <- X %*% V     # same thing X (X'X)^{-1} X'Y
+head(Y_hat_manual)
+
+# Karşılaştırma: lm() fitted values
+head(fitted(m4))
+all.equal(drop(Y_hat_manual), fitted(m4))
+
+```
+
+```{r p7}
+#QUESTION-7
+# Residuals and RSS
+resid_vals <- resid(m4)
+RSS <- sum(resid_vals^2)
+
+n <- nrow(X)    # 32
+k <- 4          # predictors
+
+MSRes <- RSS / (n - k - 1)
+
+# (X'X)^{-1}
+XtX_inv <- solve(crossprod(X))
+
+# Diagonal entries
+diag_entries <- diag(XtX_inv)
+
+# Standard errors
+se_manual <- sqrt(MSRes * diag_entries)
+se_manual
+
+# Compare with summary(m4)
+summary(m4)$coefficients[, "Std. Error"]
+```
+
+
+**Step 7.**  
+I computed the estimated standard errors of the coefficients using the formula  
+
+\[
+e.s.e.(\hat{\beta}_j) = \sqrt{MS_{Res} \cdot C_{jj}},
+\]  
+
+where \(MS_{Res} = RSS / (n - k - 1)\) and \(C_{jj}\) are the diagonal elements of \((X^TX)^{-1}\).  
+The manually calculated values exactly matched the standard errors displayed in the `summary(lm())` output, confirming the correctness of the matrix-based approach.
+
+
+
+
+## Regression Analysis with Matrix Calculations
+
+**Step 1.**  
+
+Previously, I had selected horsepower (hp) and qsec together with displacement (disp) as predictors for mpg.  
+However, because disp and hp showed high multicollinearity (VIF ≈ 9), in this assignment I replaced hp with vs and also added am as the fourth predictor.  
+The final model therefore uses disp, vs, qsec, and am.
+
+**Step 2.**  
+I constructed the design matrix \(X\) (a 32 × 5 matrix including the intercept) and the response vector \(Y\) (32 × 1).  
+Initially my dataset had only 30 observations because I had removed rows with missing values in Problem Set 1.  
+To restore the full 32 rows required for this assignment, I imputed the missing values using the median of the corresponding variable.  
+This ensured that both \(X\) and \(Y\) had the correct dimensions.
+
+**Step 3.**  
+I computed \(X^TX\) and its inverse \((X^TX)^{-1}\).  
+Both matrices were 5 × 5, which is consistent with having an intercept and four predictors in the model.  
+These matrices are essential for solving the normal equations in multiple regression.
+
+**Step 4.**  
+Next, I calculated \((X^TX)^{-1}X^TY\).  
+This gave me the coefficient vector \(\hat{\beta}\), with entries corresponding to \(\hat{\beta}_0, \hat{\beta}_1, \hat{\beta}_2, \hat{\beta}_3, \hat{\beta}_4\).  
+The results matched the coefficient estimates from the `lm` function, confirming that the matrix approach is equivalent to the built-in regression routine.
+
+**Step 5.**  
+I then solved the matrix equation \((X^TX)V = X^TY\) directly using the `solve()` command.  
+The solution vector \(V\) was the same as the coefficients obtained in Step 4 and from the `lm` object.  
+This confirmed that both methods give identical results.
+
+**Step 6.**  
+I calculated the fitted values using the formula  
+\[
+\hat{Y} = X (X^TX)^{-1} X^T Y,
+\]  
+which is equivalent to \(X \hat{\beta}\).  
+The fitted values matched exactly with those returned by the `fitted()` function in R, verifying the correctness of the manual computation.
+
+**Step 7.**  
+Finally, I computed the estimated standard errors of the coefficients using the formula  
+\[
+e.s.e.(\hat{\beta}_j) = \sqrt{MS_{Res} \cdot C_{jj}},
+\]  
+where \(MS_{Res} = RSS / (n - k - 1)\) and \(C_{jj}\) are the diagonal elements of \((X^TX)^{-1}\).  
+The manually calculated standard errors matched perfectly with the values reported in the `summary(lm())` output.  
+This confirmed that the matrix algebra results are consistent with the regression analysis in R.
+
+
+Additional Comment:
+The final model has a good adjusted R² (0.7654), which shows that it explains most of the variation in mpg. However, not all predictors are statistically significant. For example, vs (p = 0.36) and am (p = 0.13) do not have strong individual effects. Still, I decided to keep them in the model because they represent different dimensions of the car and also help to avoid multicollinearity problems compared to the initial version. Since the dataset is quite small (n = 32), the results should be interpreted with some caution. Adding diagnostic plots (such as residuals or QQ plot) could give more information about the model fit.
+
